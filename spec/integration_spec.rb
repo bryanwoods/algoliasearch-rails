@@ -983,6 +983,20 @@ describe 'Kaminari' do
     p2[0].should eq(pagination[1])
     p2.total_count.should eq(City.raw_search('')['nbHits'])
   end
+
+  describe "#results" do
+    it "returns itself for sunspot compatibility" do
+      pagination = City.search ''
+      pagination.results.should == pagination
+    end
+  end
+
+  describe "#total" do
+    it "returns the number of results for sunspot compatibility" do
+      pagination = City.search ''
+      pagination.total.should == City.count
+    end
+  end
 end
 
 describe 'Will_paginate' do

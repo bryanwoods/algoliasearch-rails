@@ -17,6 +17,14 @@ module AlgoliaSearch
         self
       end
 
+      def results
+        self
+      end
+
+      def total
+        length
+      end
+
       def offset(num)
         # noop
         self
