@@ -22,7 +22,7 @@ module AlgoliaSearch
       end
 
       def total
-        length
+        raw_answer["nbHits"]
       end
 
       def offset(num)
