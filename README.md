@@ -2,86 +2,76 @@
 
 [Algolia Search](https://www.algolia.com) is a hosted full-text, numerical, and faceted search engine capable of delivering realtime results from the first keystroke.
 
-This gem let you easily integrate the Algolia Search API to your favorite ORM. It's based on the [algoliasearch-client-ruby](https://github.com/algolia/algoliasearch-client-ruby) gem. Rails 3.x, 4.x and 5.x are all supported.
-
-You might be interested in the sample Ruby on Rails application providing a `autocomplete.js`-based auto-completion and `instantsearch.js`-based instant search results page: [algoliasearch-rails-example](https://github.com/algolia/algoliasearch-rails-example/).
-
 [![Build Status](https://travis-ci.org/algolia/algoliasearch-rails.svg?branch=master)](https://travis-ci.org/algolia/algoliasearch-rails) [![Gem Version](https://badge.fury.io/rb/algoliasearch-rails.svg)](http://badge.fury.io/rb/algoliasearch-rails) [![Code Climate](https://codeclimate.com/github/algolia/algoliasearch-rails.svg)](https://codeclimate.com/github/algolia/algoliasearch-rails) ![ActiveRecord](https://img.shields.io/badge/ActiveRecord-yes-blue.svg?style=flat-square) ![Mongoid](https://img.shields.io/badge/Mongoid-yes-blue.svg?style=flat-square) ![Sequel](https://img.shields.io/badge/Sequel-yes-blue.svg?style=flat-square)
 
 
-**Note:** An easier-to-read version of this documentation is available on
-[Algolia's website](https://www.algolia.com/doc/api-client/rails/).
+This gem let you easily integrate the Algolia Search API to your favorite ORM. It's based on the [algoliasearch-client-ruby](https://github.com/algolia/algoliasearch-client-ruby) gem.
+Rails 3.x, 4.x and 5.x are all supported.
 
-# Table of Contents
-
-
-**Setup**
-
-1. [Install](#install)
-1. [Configuration](#configuration)
-1. [Timeouts](#timeouts)
-1. [Notes](#notes)
-
-**Usage**
-
-1. [Index Schema](#index-schema)
-1. [Relevancy](#relevancy)
-1. [Indexing](#indexing)
-1. [Frontend Search (realtime experience)](#frontend-search-realtime-experience)
-1. [Backend Search](#backend-search)
-1. [Backend Pagination](#backend-pagination)
-1. [Tags](#tags)
-1. [Faceting](#faceting)
-1. [Faceted search](#faceted-search)
-1. [Group by](#group-by)
-1. [Geo-Search](#geo-search)
-
-**Options**
-
-1. [Auto-indexing &amp; asynchronism](#auto-indexing--asynchronism)
-1. [Custom index name](#custom-index-name)
-1. [Per-environment indices](#per-environment-indices)
-1. [Custom attribute definition](#custom-attribute-definition)
-1. [Nested objects/relations](#nested-objectsrelations)
-1. [Custom `objectID`](#custom-objectid)
-1. [Restrict indexing to a subset of your data](#restrict-indexing-to-a-subset-of-your-data)
-1. [Sanitizer](#sanitizer)
-1. [UTF-8 Encoding](#utf-8-encoding)
-1. [Exceptions](#exceptions)
-1. [Configuration example](#configuration-example)
-
-**Indices**
-
-1. [Manual indexing](#manual-indexing)
-1. [Manual removal](#manual-removal)
-1. [Reindexing](#reindexing)
-1. [Clearing an index](#clearing-an-index)
-1. [Using the underlying index](#using-the-underlying-index)
-1. [Primary/replica](#primaryreplica)
-1. [Share a single index](#share-a-single-index)
-1. [Target multiple indices](#target-multiple-indices)
-
-**Testing**
-
-1. [Notes](#notes)
+You might be interested in the sample Ruby on Rails application providing a `autocomplete.js`-based auto-completion and `instantsearch.js`-based instant search results page: [algoliasearch-rails-example](https://github.com/algolia/algoliasearch-rails-example/).
 
 
-# Guides & Tutorials
 
-Check our [online guides](https://www.algolia.com/doc):
 
-* [Data Formatting](https://www.algolia.com/doc/indexing/formatting-your-data)
-* [Import and Synchronize data](https://www.algolia.com/doc/indexing/import-synchronize-data/php)
-* [Autocomplete](https://www.algolia.com/doc/search/auto-complete)
-* [Instant search page](https://www.algolia.com/doc/search/instant-search)
-* [Filtering and Faceting](https://www.algolia.com/doc/search/filtering-faceting)
-* [Sorting](https://www.algolia.com/doc/relevance/sorting)
-* [Ranking Formula](https://www.algolia.com/doc/relevance/ranking)
-* [Typo-Tolerance](https://www.algolia.com/doc/relevance/typo-tolerance)
-* [Geo-Search](https://www.algolia.com/doc/geo-search/geo-search-overview)
-* [Security](https://www.algolia.com/doc/security/best-security-practices)
-* [API-Keys](https://www.algolia.com/doc/security/api-keys)
-* [REST API](https://www.algolia.com/doc/rest)
+## API Documentation
+
+You can find the full reference on [Algolia's website](https://www.algolia.com/doc/api-client/rails/).
+
+
+## Table of Contents
+
+
+1. **[Setup](#setup)**
+
+    * [Install](#install)
+    * [Configuration](#configuration)
+    * [Timeouts](#timeouts)
+    * [Notes](#notes)
+
+1. **[Usage](#usage)**
+
+    * [Index Schema](#index-schema)
+    * [Relevancy](#relevancy)
+    * [Indexing](#indexing)
+    * [Frontend Search (realtime experience)](#frontend-search-realtime-experience)
+    * [Backend Search](#backend-search)
+    * [Backend Pagination](#backend-pagination)
+    * [Tags](#tags)
+    * [Faceting](#faceting)
+    * [Faceted search](#faceted-search)
+    * [Group by](#group-by)
+    * [Geo-Search](#geo-search)
+
+1. **[Options](#options)**
+
+    * [Auto-indexing &amp; asynchronism](#auto-indexing--asynchronism)
+    * [Custom index name](#custom-index-name)
+    * [Per-environment indices](#per-environment-indices)
+    * [Custom attribute definition](#custom-attribute-definition)
+    * [Nested objects/relations](#nested-objectsrelations)
+    * [Custom `objectID`](#custom-objectid)
+    * [Restrict indexing to a subset of your data](#restrict-indexing-to-a-subset-of-your-data)
+    * [Sanitizer](#sanitizer)
+    * [UTF-8 Encoding](#utf-8-encoding)
+    * [Exceptions](#exceptions)
+    * [Configuration example](#configuration-example)
+
+1. **[Indices](#indices)**
+
+    * [Manual indexing](#manual-indexing)
+    * [Manual removal](#manual-removal)
+    * [Reindexing](#reindexing)
+    * [Clearing an index](#clearing-an-index)
+    * [Using the underlying index](#using-the-underlying-index)
+    * [Primary/replica](#primaryreplica)
+    * [Share a single index](#share-a-single-index)
+    * [Target multiple indices](#target-multiple-indices)
+
+1. **[Testing](#testing)**
+
+    * [Notes](#notes)
+
+
 
 
 # Setup
@@ -301,8 +291,8 @@ class Contact < ActiveRecord::Base
     attribute :first_name, :last_name, :email
 
     # default search parameters stored in the index settings
-    minWordSizeForApprox1 4
-    minWordSizeForApprox2 8
+    minWordSizefor1Typo 4
+    minWordSizefor2Typos 8
     hitsPerPage 42
   end
 end
@@ -541,8 +531,16 @@ end
 
 class MySidekiqWorker
   def perform(id, remove)
-    c = Contact.find(id)
-    remove ? c.remove_from_index! : c.index!
+    if remove
+      # the record has likely already been removed from your database so we cannot
+      # use ActiveRecord#find to load it
+      index = Algolia::Index.new("index_name")
+      index.delete_object(id)
+    else
+      # the record should be present
+      c = Contact.find(id)
+      c.index!
+    end
   end
 end
 ```
@@ -922,7 +920,8 @@ index = Contact.index
 
 ## Primary/replica
 
-You can define replica indices using the <code>add_replica</code> method:
+You can define replica indices using the <code>add_replica</code> method.
+Use `inherit: true` on the replica block if you want it  to inherit from the primary settings.
 
 ```ruby
 class Book < ActiveRecord::Base
@@ -938,9 +937,9 @@ class Book < ActiveRecord::Base
       searchableAttributes [:author]
     end
 
-    # define a replica index to search by `editor` only
-    add_replica 'Book_by_editor', per_environment: true do
-      searchableAttributes [:editor]
+    # define a replica index with custom ordering but same settings than the main block
+    add_replica 'Book_custom_order', inherit: true, per_environment: true do
+      customRanking ['asc(rank)']
     end
   end
 
@@ -1085,5 +1084,6 @@ describe 'With a mocked client' do
 
 end
 ```
+
 
 

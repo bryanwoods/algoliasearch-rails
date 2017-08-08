@@ -1,5 +1,33 @@
 CHANGELOG
 
+2017-08-04 1.20.1
+
+      * Make sure objectIDs are manipulated as strings
+
+2017-07-31 1.20.0
+
+      * Override the user-agent (#238)
+      * Fixed NPE while running mocked tests (#242)
+      * Add `paginationLimitedTo` setting (#243)
+      * Make `algolia_without_auto_index_scope` thread-safe (#234)
+
+2017-03-13 1.19.1
+
+      * Make sure get_model_classes is not ActiveRecord compliant only
+
+2017-03-13 1.19.0
+
+      * Rewrote the algoliasearch:reindex rake task to better detect models to reindex
+      * Fixed the handling of `raise_on_failture` for class methods
+
+2017-02-16 1.18.0
+
+      * Add new replica parameter, `inherit` (#198)
+
+2017-01-05 1.17.1
+
+      * Add missing `disablePrefixOnAttributes` and `disableTypoToleranceOnAttributes` attributes (#193)
+
 2017-01-05 1.17.0
 
       * Do not enqueue indexing operations if the indexing is disabled

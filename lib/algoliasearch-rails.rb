@@ -8,6 +8,7 @@ rescue => e
 end
 require 'algoliasearch'
 
+require 'algoliasearch/version'
 require 'algoliasearch/utilities'
 
 if defined? Rails
@@ -66,7 +67,8 @@ module AlgoliaSearch
       :unretrievableAttributes, :disableTypoToleranceOnWords, :disableTypoToleranceOnAttributes, :altCorrections,
       :ignorePlurals, :maxValuesPerFacet, :distinct, :numericAttributesToIndex, :numericAttributesForFiltering,
       :allowTyposOnNumericTokens, :allowCompressionOfIntegerArray,
-      :advancedSyntax]
+      :advancedSyntax, :disablePrefixOnAttributes, :disableTypoToleranceOnAttributes,
+      :paginationLimitedTo]
     OPTIONS.each do |k|
       define_method k do |v|
         instance_variable_set("@#{k}", v)
@@ -256,13 +258,13 @@ module AlgoliaSearch
     def add_replica(index_name, options = {}, &block)
       raise ArgumentError.new('Cannot specify additional replicas on a replica index') if @options[:slave] || @options[:replica]
       raise ArgumentError.new('No block given') if !block_given?
-      add_index(index_name, options.merge({ :replica => true }), &block)
+      add_index(index_name, options.merge({ :replica => true, :primary_settings => self }), &block)
     end
 
     def add_slave(index_name, options = {}, &block)
       raise ArgumentError.new('Cannot specify additional slaves on a slave index') if @options[:slave] || @options[:replica]
       raise ArgumentError.new('No block given') if !block_given?
-      add_index(index_name, options.merge({ :slave => true }), &block)
+      add_index(index_name, options.merge({ :slave => true, :primary_settings => self }), &block)
     end
 
     def additional_indexes
@@ -288,7 +290,7 @@ module AlgoliaSearch
 
     ::Algolia::Index.instance_methods(false).each do |m|
       define_method(m) do |*args, &block|
-        SafeIndex.log_or_throw(m) do
+        SafeIndex.log_or_throw(m, @raise_on_failure) do
           @index.send(m, *args, &block)
         end
       end
@@ -297,18 +299,18 @@ module AlgoliaSearch
     # special handling of wait_task to handle null task_id
     def wait_task(task_id)
       return if task_id.nil? && !@raise_on_failure # ok
-      SafeIndex.log_or_throw(:wait_task) do
+      SafeIndex.log_or_throw(:wait_task, @raise_on_failure) do
         @index.wait_task(task_id)
       end
     end
 
     # special handling of get_settings to avoid raising errors on 404
     def get_settings(*args)
-      SafeIndex.log_or_throw(:get_settings) do
+      SafeIndex.log_or_throw(:get_settings, @raise_on_failure) do
         begin
           @index.get_settings(*args)
         rescue Algolia::AlgoliaError => e
-          return {} if e.status == 404 # not fatal
+          return {} if e.code == 404 # not fatal
           raise e
         end
       end
@@ -316,17 +318,17 @@ module AlgoliaSearch
 
     # expose move as well
     def self.move_index(old_name, new_name)
-      SafeIndex.log_or_throw(:move_index) do
+      SafeIndex.log_or_throw(:move_index, true) do
         ::Algolia.move_index(old_name, new_name)
       end
     end
 
     private
-    def self.log_or_throw(method, &block)
+    def self.log_or_throw(method, raise_on_failure, &block)
       begin
         yield
       rescue Algolia::AlgoliaError => e
-        raise e if @raise_on_failure
+        raise e if raise_on_failure
         # log the error
         (Rails.logger || Logger.new(STDOUT)).error("[algoliasearch-rails] #{e.message}")
         # return something
@@ -400,7 +402,7 @@ module AlgoliaSearch
           raise ArgumentError.new("Invalid `enqueue` option: #{options[:enqueue]}")
         end
         algoliasearch_options[:enqueue] = Proc.new do |record, remove|
-          proc.call(record, remove) unless @algolia_without_auto_index_scope
+          proc.call(record, remove) unless algolia_without_auto_index_scope
         end
       end
       unless options[:auto_index] == false
@@ -456,16 +458,24 @@ module AlgoliaSearch
     end
 
     def algolia_without_auto_index(&block)
-      @algolia_without_auto_index_scope = true
+      self.algolia_without_auto_index_scope = true
       begin
         yield
       ensure
-        @algolia_without_auto_index_scope = false
+        self.algolia_without_auto_index_scope = false
       end
     end
 
+    def algolia_without_auto_index_scope=(value)
+      Thread.current["algolia_without_auto_index_scope_for_#{self.model_name}"] = value
+    end
+
+    def algolia_without_auto_index_scope
+      Thread.current["algolia_without_auto_index_scope_for_#{self.model_name}"]
+    end
+
     def algolia_reindex!(batch_size = 1000, synchronous = false)
-      return if @algolia_without_auto_index_scope
+      return if algolia_without_auto_index_scope
       algolia_configurations.each do |options, settings|
         next if algolia_indexing_disabled?(options)
         index = algolia_ensure_init(options, settings)
@@ -496,7 +506,7 @@ module AlgoliaSearch
 
     # reindex whole database using a extra temporary index + move operation
     def algolia_reindex(batch_size = 1000, synchronous = false)
-      return if @algolia_without_auto_index_scope
+      return if algolia_without_auto_index_scope
       algolia_configurations.each do |options, settings|
         next if algolia_indexing_disabled?(options)
         next if options[:slave] || options[:replica]
@@ -545,7 +555,7 @@ module AlgoliaSearch
     end
 
     def algolia_index!(object, synchronous = false)
-      return if @algolia_without_auto_index_scope
+      return if algolia_without_auto_index_scope
       algolia_configurations.each do |options, settings|
         next if algolia_indexing_disabled?(options)
         object_id = algolia_object_id_of(object, options)
@@ -571,7 +581,7 @@ module AlgoliaSearch
     end
 
     def algolia_remove_from_index!(object, synchronous = false)
-      return if @algolia_without_auto_index_scope
+      return if algolia_without_auto_index_scope
       object_id = algolia_object_id_of(object)
       raise ArgumentError.new("Cannot index a record with a blank objectID") if object_id.blank?
       algolia_configurations.each do |options, settings|
@@ -648,7 +658,7 @@ module AlgoliaSearch
         algolia_object_id_of(hit)
       end
       results = json['hits'].map do |hit|
-        o = results_by_id[hit['objectID']]
+        o = results_by_id[hit['objectID'].to_s]
         if o
           o.highlight_result = hit['_highlightResult']
           o.snippet_result = hit['_snippetResult']
@@ -731,22 +741,31 @@ module AlgoliaSearch
 
     def algolia_ensure_init(options = nil, settings = nil, index_settings = nil)
       raise ArgumentError.new('No `algoliasearch` block found in your model.') if algoliasearch_settings.nil?
+
       @algolia_indexes ||= {}
+
       options ||= algoliasearch_options
       settings ||= algoliasearch_settings
+
       return @algolia_indexes[settings] if @algolia_indexes[settings]
+
       @algolia_indexes[settings] = SafeIndex.new(algolia_index_name(options), algoliasearch_options[:raise_on_failure])
+
       current_settings = @algolia_indexes[settings].get_settings rescue nil # if the index doesn't exist
-      if !algolia_indexing_disabled?(options) && (index_settings || algoliasearch_settings_changed?(current_settings, settings.to_settings))
-        index_settings ||= settings.to_settings
+
+      index_settings ||= settings.to_settings
+      index_settings = options[:primary_settings].to_settings.merge(index_settings) if options[:inherit]
+
+      if !algolia_indexing_disabled?(options) && (index_settings || algoliasearch_settings_changed?(current_settings, index_settings))
         used_slaves = !current_settings.nil? && !current_settings['slaves'].nil?
         replicas = index_settings.delete(:replicas) ||
                    index_settings.delete('replicas') ||
                    index_settings.delete(:slaves) ||
                    index_settings.delete('slaves')
-        index_settings[used_slaves ? :slaves : :replicas] = replicas
+        index_settings[used_slaves ? :slaves : :replicas] = replicas unless replicas.nil? || options[:inherit]
         @algolia_indexes[settings].set_settings(index_settings)
       end
+
       @algolia_indexes[settings]
     end
 

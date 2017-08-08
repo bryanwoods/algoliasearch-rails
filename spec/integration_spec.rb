@@ -22,7 +22,10 @@ ActiveRecord::Base.establish_connection(
     'pool' => 5,
     'timeout' => 5000
 )
-ActiveRecord::Base.raise_in_transactional_callbacks = true unless OLD_RAILS
+
+if ActiveRecord::Base.respond_to?(:raise_in_transactional_callbacks)
+  ActiveRecord::Base.raise_in_transactional_callbacks = true
+end
 
 SEQUEL_DB = Sequel.connect(defined?(JRUBY_VERSION) ? 'jdbc:sqlite:sequel_data.sqlite3' : { 'adapter' => 'sqlite', 'database' => 'sequel_data.sqlite3' })
 
@@ -89,6 +92,12 @@ ActiveRecord::Schema.define do
     t.string :name
   end
   create_table :encoded_strings do |t|
+  end
+  create_table :forward_to_replicas do |t|
+    t.string :name
+  end
+  create_table :forward_to_replicas_twos do |t|
+    t.string :name
   end
   create_table :sub_replicas do |t|
     t.string :name
@@ -391,6 +400,9 @@ class WithSlave < ActiveRecord::Base
     add_slave safe_index_name("WithSlave_slave") do
     end
   end
+
+  # Ensure the index is indeed using slaves
+  algolia_index.set_settings({:slaves => [safe_index_name("WithSlave_slave")]})
 end
 
 unless OLD_RAILS
@@ -442,6 +454,26 @@ describe 'Encoding' do
     end
   end
 
+end
+
+# Rails 3.2 swallows exception in after_commit
+unless OLD_RAILS
+  describe 'Too big records' do
+    before(:all) do
+      Color.clear_index!(true)
+    end
+
+    after(:all) do
+      Color.delete_all
+    end
+
+    it "Throw an exception if the data is too big" do
+      expect {
+        Color.create! :name => 'big' * 100000
+      }.to raise_error(Algolia::AlgoliaProtocolError)
+    end
+
+  end
 end
 
 describe 'Settings' do
@@ -622,7 +654,6 @@ describe 'Colors' do
   end
 
   it "should search inside facets" do
-    puts Color.index.name
     @blue = Color.create!(:name => "blue", :short_name => "blu", :hex => 0x0000FF)
     @black = Color.create!(:name => "black", :short_name => "bla", :hex => 0x000000)
     @green = Color.create!(:name => "green", :short_name => "gre", :hex => 0x00FF00)
@@ -892,6 +923,82 @@ describe 'Cities' do
     expect(City.index(safe_index_name('City_replica2')).get_settings['customRanking']).to eq(['asc(a)', 'desc(c)'])
   end
 
+end
+
+describe "FowardToReplicas" do
+  before(:each) do
+    Object.send(:remove_const, :ForwardToReplicas) if Object.constants.include?(:ForwardToReplicas)
+
+    class ForwardToReplicas < ActiveRecord::Base
+      include AlgoliaSearch
+
+      algoliasearch :synchronous => true, :index_name => safe_index_name('ForwardToReplicas') do
+        attribute :name
+        attributesToIndex %w(first_value)
+        attributesToHighlight %w(primary_highlight)
+
+        add_replica safe_index_name('ForwardToReplicas_replica') do
+          attributesToHighlight %w(replica_highlight)
+        end
+      end
+    end
+  end
+
+  after(:each) do
+    ForwardToReplicas.index.delete!
+  end
+
+  it 'shouldn\'t have inherited from the primary' do
+    ForwardToReplicas.send :algolia_ensure_init
+
+    # Hacky way to have a wait on set_settings
+    ForwardToReplicas.create(:name => 'val')
+    ForwardToReplicas.reindex!
+
+    primary_settings = ForwardToReplicas.index.get_settings
+    expect(primary_settings['attributesToIndex']).to eq(%w(first_value))
+    expect(primary_settings['attributesToHighlight']).to eq(%w(primary_highlight))
+
+    replica_settings = ForwardToReplicas.index(safe_index_name('ForwardToReplicas_replica')).get_settings
+    expect(replica_settings['attributesToIndex']).to eq(nil)
+    expect(replica_settings['attributesToHighlight']).to eq(%w(replica_highlight))
+  end
+
+  it 'should update the replica settings when changed' do
+    Object.send(:remove_const, :ForwardToReplicasTwo) if Object.constants.include?(:ForwardToReplicasTwo)
+
+    class ForwardToReplicasTwo < ActiveRecord::Base
+      include AlgoliaSearch
+
+      algoliasearch :synchronous => true, :index_name => safe_index_name('ForwardToReplicas') do
+        attribute :name
+        attributesToIndex %w(second_value)
+        attributesToHighlight %w(primary_highlight)
+
+        add_replica safe_index_name('ForwardToReplicas_replica'), :inherit => true do
+          attributesToHighlight %w(replica_highlight)
+        end
+      end
+    end
+
+    ForwardToReplicas.send :algolia_ensure_init
+
+    ForwardToReplicasTwo.send :algolia_ensure_init
+
+    # Hacky way to have a wait on set_settings
+    ForwardToReplicasTwo.create(:name => 'val')
+    ForwardToReplicasTwo.reindex!
+
+    primary_settings = ForwardToReplicas.index.get_settings
+    expect(primary_settings['attributesToIndex']).to eq(%w(second_value))
+    expect(primary_settings['attributesToHighlight']).to eq(%w(primary_highlight))
+
+    replica_settings = ForwardToReplicas.index(safe_index_name('ForwardToReplicas_replica')).get_settings
+    expect(replica_settings['attributesToIndex']).to eq(%w(second_value))
+    expect(replica_settings['attributesToHighlight']).to eq(%w(replica_highlight))
+
+    expect(ForwardToReplicas.index.name).to eq(ForwardToReplicasTwo.index.name)
+  end
 end
 
 describe "SubReplicas" do

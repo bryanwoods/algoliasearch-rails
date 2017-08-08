@@ -1,8 +1,11 @@
 source "http://rubygems.org"
 
-gem 'json', '~> 1.5', '>= 1.5.1'
-gem 'algoliasearch', '~> 1.12.4'
-gem 'rubysl', '~> 2.0', :platform => :rbx
+gem 'json', '~> 1.8', '>= 1.8.6'
+gem 'algoliasearch', '~> 1.14.0'
+
+if defined?(RUBY_ENGINE) && RUBY_ENGINE == 'rbx'
+  gem 'rubysl', '~> 2.0', :platform => :rbx
+end
 
 group :test do
   rails_version = ENV["RAILS_VERSION"] ? "~> #{ENV["RAILS_VERSION"]}" : '>= 3.2.0'
@@ -47,5 +50,12 @@ end
 
 group :test, :development do
   gem 'will_paginate', '>= 2.3.15'
-  gem 'kaminari'
+  if defined?(RUBY_VERSION) &&
+     defined?(RUBY_ENGINE) &&
+     RUBY_ENGINE == 'ruby' &&
+     Gem::Version.new(RUBY_VERSION) < Gem::Version.new('2')
+    gem 'kaminari', '< 1'
+  else
+    gem 'kaminari'
+  end
 end
